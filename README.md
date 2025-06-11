@@ -1,1 +1,1 @@
-# multiplex-ws
+# pubsub
