@@ -12,30 +12,40 @@
             height: 200px;
             overflow-y: auto;
         }
+        #sessionInfo {
+            background: #f0f0f0;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
     <h1>WebSocket Demo</h1>
     <div id="connectionStatus">Status: Disconnected</div>
+    <div id="sessionInfo">Session ID: Not connected</div>
     <div id="messageContainer"></div>
     
-    <select id="channelSelect">
-        <option value="general">General</option>
-        <option value="sports">Sports</option>
-        <option value="politics">Politics</option>
-        <option value="invalid">Invalid Channel</option>
+    <select id="topicSelect">
+        <option value="cars">Cars</option>
+        <option value="bikes">Bikes</option>
+        <option value="trucks">Trucks</option>
+        <option value="boats">Boats</option>
     </select>
     <input type="text" id="messageInput" placeholder="Type your message">
     <button onclick="sendMessage()">Send Message</button>
     <button onclick="disconnect()">Disconnect</button>
+    <button onclick="switchTopic()">Switch Topic</button>
 
     <script>
         let ws;
         const messageContainer = document.getElementById('messageContainer');
         const statusElement = document.getElementById('connectionStatus');
+        const sessionElement = document.getElementById('sessionInfo');
 
         // Replace with your deployed Worker URL below:
-        const wsUrl = 'wss://ws-multiplexing.[YOUR-IDENTIFIER].workers.dev/ws';
+        const wsUrl = 'wss://pubsub.[MY-IDENTIFIER].workers.dev/subscribe';
         
         function getUrlParameter(name) {
             const urlParams = new URLSearchParams(window.location.search);
@@ -46,13 +56,40 @@
             return Math.random().toString(36).substring(2, 15);
         }
         
-        function connect() {
-            const sessionId = getUrlParameter('id') || generateRandomId();
-            ws = new WebSocket(`${wsUrl}?id=${encodeURIComponent(sessionId)}`);
+        function connect(topic = 'cars') {
+            const sessionId = getUrlParameter('clientId') || generateRandomId();
+            const hasClientId = getUrlParameter('clientId') !== null;
+            
+            sessionElement.textContent = '';  // Clear existing content
+            
+            // Create and append parts of the text with conditional bolding
+            if (hasClientId) {
+                const boldPart = document.createElement('strong');
+                boldPart.textContent = 'Session ID: ';
+                sessionElement.appendChild(boldPart);
+                sessionElement.appendChild(document.createTextNode(`${sessionId} | `));
+                sessionElement.appendChild(document.createTextNode(`Topic: ${topic}`));
+            } else {
+                sessionElement.appendChild(document.createTextNode(`Session ID: ${sessionId} | `));
+                const boldPart = document.createElement('strong');
+                boldPart.textContent = 'Topic: ';
+                sessionElement.appendChild(boldPart);
+                sessionElement.appendChild(document.createTextNode(topic));
+            }
+            
+            if (ws) {
+                ws.close();
+            }
+
+            if (hasClientId) {
+                ws = new WebSocket(`${wsUrl}?clientId=${encodeURIComponent(sessionId)}`);
+            } else {
+                ws = new WebSocket(`${wsUrl}?topic=${encodeURIComponent(topic)}`);
+            }
 
             ws.onopen = () => {
                 statusElement.textContent = 'Status: Connected';
-                addMessage('System', 'Connected to server');
+                addMessage('System', `Connected to server on topic: ${topic}`);
             };
 
             ws.onmessage = (event) => {
@@ -72,20 +109,25 @@
 
         function sendMessage() {
             const messageInput = document.getElementById('messageInput');
-            const channelSelect = document.getElementById('channelSelect');
+            const topicSelect = document.getElementById('topicSelect');
             const message = messageInput.value.trim();
-            const channel = channelSelect.value;
+            const topic = topicSelect.value;
             
             if (message && ws && ws.readyState === WebSocket.OPEN) {
-                // Send message with channel information
                 const payload = JSON.stringify({
-                    channel: channel,
+                    topic: topic,
                     message: message
                 });
                 ws.send(payload);
-                addMessage('Sent', `[${channel}] ${message}`);
+                addMessage('Sent', `[${topic}] ${message}`);
                 messageInput.value = '';
             }
+        }
+
+        function switchTopic() {
+            const topicSelect = document.getElementById('topicSelect');
+            const newTopic = topicSelect.value;
+            connect(newTopic);
         }
 
         function disconnect() {

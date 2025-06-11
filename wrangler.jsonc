@@ -1,13 +1,13 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "ws-multiplexing",
+	"name": "pubsub",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-03-03",
 	"migrations": [
 		{
 			"new_sqlite_classes": [
-                "UserDurableObject",
-				"ChannelDurableObject"
+                "ClientDurableObject",
+				"TopicDurableObject"
 			],
 			"tag": "v1"
 		}
@@ -15,12 +15,12 @@
 	"durable_objects": {
 		"bindings": [
             {
-				"class_name": "UserDurableObject",
-				"name": "USER_DURABLE_OBJECT"
+				"class_name": "ClientDurableObject",
+				"name": "CLIENT_DURABLE_OBJECT"
 			},
 			{
-				"class_name": "ChannelDurableObject",
-				"name": "CHANNEL_DURABLE_OBJECT"
+				"class_name": "TopicDurableObject",
+				"name": "TOPIC_DURABLE_OBJECT"
 			}
 		]
 	},

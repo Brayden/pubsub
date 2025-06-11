@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT Demo</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        #messageContainer {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px 0;
+            height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>MQTT Demo</h1>
+    <div id="connectionStatus">Status: Disconnected</div>
+    <div id="messageContainer"></div>
+    
+    <select id="channelSelect">
+        <option value="general">General</option>
+        <option value="sports">Sports</option>
+        <option value="politics">Politics</option>
+        <option value="invalid">Invalid Channel</option>
+    </select>
+    <input type="text" id="messageInput" placeholder="Type your message">
+    <button onclick="sendMessage()">Send Message</button>
+    <button onclick="disconnect()">Disconnect</button>
+
+    <script>
+        let client;
+        const messageContainer = document.getElementById('messageContainer');
+        const statusElement = document.getElementById('connectionStatus');
+
+        // Replace with your MQTT broker WebSocket URL
+        const brokerUrl = 'wss://pubsub.[MY-IDENTIFIER].workers.dev/subscribe?clientId=2';
+        
+        function getUrlParameter(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+
+        function generateRandomId() {
+            return Math.random().toString(36).substring(2, 15);
+        }
+        
+        function connect() {
+            const clientId = getUrlParameter('id') || generateRandomId();
+            
+            const options = {
+                clientId: clientId,
+                clean: true,
+                reconnectPeriod: 1000,
+                connectTimeout: 30 * 1000
+            };
+
+            client = mqtt.connect(brokerUrl, options);
+
+            client.on('connect', () => {
+                statusElement.textContent = 'Status: Connected';
+                addMessage('System', 'Connected to MQTT broker');
+                
+                // Subscribe to all channels
+                ['general', 'sports', 'politics'].forEach(channel => {
+                    client.subscribe(`demo/${channel}`, (err) => {
+                        if (!err) {
+                            addMessage('System', `Subscribed to ${channel} channel`);
+                        }
+                    });
+                });
+            });
+
+            client.on('message', (topic, message) => {
+                const channel = topic.split('/')[1];
+                try {
+                    const payload = JSON.parse(message.toString());
+                    addMessage('Received', `[${channel}] ${payload.message}`);
+                } catch (e) {
+                    addMessage('Received', `[${channel}] ${message.toString()}`);
+                }
+            });
+
+            client.on('error', (error) => {
+                console.error('MQTT error:', error);
+                addMessage('Error', 'Connection error occurred');
+            });
+
+            client.on('close', () => {
+                statusElement.textContent = 'Status: Disconnected';
+                addMessage('System', 'Disconnected from MQTT broker');
+            });
+        }
+
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const channelSelect = document.getElementById('channelSelect');
+            const message = messageInput.value.trim();
+            const channel = channelSelect.value;
+            
+            if (message && client && client.connected) {
+                const payload = {
+                    message: message,
+                    timestamp: new Date().toISOString()
+                };
+                
+                client.publish(`demo/${channel}`, JSON.stringify(payload), { qos: 1 }, (error) => {
+                    if (error) {
+                        addMessage('Error', `Failed to send message to ${channel}`);
+                    } else {
+                        addMessage('Sent', `[${channel}] ${message}`);
+                        messageInput.value = '';
+                    }
+                });
+            }
+        }
+
+        function disconnect() {
+            if (client && client.connected) {
+                ['general', 'sports', 'politics'].forEach(channel => {
+                    client.unsubscribe(`demo/${channel}`);
+                });
+                client.end();
+                statusElement.textContent = 'Status: Disconnected';
+                addMessage('System', 'Manually disconnected from MQTT broker');
+            }
+        }
+
+        function addMessage(source, message) {
+            const messageElement = document.createElement('div');
+            messageElement.textContent = `${source}: ${message}`;
+            messageContainer.appendChild(messageElement);
+            messageContainer.scrollTop = messageContainer.scrollHeight;
+        }
+
+        // Connect when the page loads
+        connect();
+    </script>
+</body>
+</html>
